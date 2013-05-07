@@ -3,7 +3,7 @@ package main
 import (
   "fmt"
   "flag"
-  // "time"
+  "time"
   "io/ioutil"
   "encoding/xml"
 )
@@ -49,15 +49,22 @@ func main() {
     panic(fmt.Sprintf("GO FIGURE: I cannot unmarshall like a boss: `%v'", err))
   }
 
-  // let's use time. <== this time like a *real* boss
-  // time, err := time.Parse(time.RFC3339, activity.Id)
+  k := 0
 
-  fmt.Println("data\tclose")
+  fmt.Println("date\thr")
 
   for i := 0; i < len(activity.Laps); i++ {
     // inception... a loop inside a loop.
     for j:= 0; j < len(activity.Laps[i].Trackpoints); j++ {
-      fmt.Printf("%s\t%d\n", activity.Laps[i].Trackpoints[j].Time, activity.Laps[i].Trackpoints[j].HeartRateBpm)
+      time, err := time.Parse(time.RFC3339, activity.Laps[i].Trackpoints[j].Time)
+      if err != nil {
+        fmt.Println("Most likely we failed to parse the time.", err)
+      }
+      fmt.Printf("%d\t%d\n", time.Unix(), activity.Laps[i].Trackpoints[j].HeartRateBpm)
+      k += 1
+      if k > 200 {
+        return
+      }
     }
   }
 }
