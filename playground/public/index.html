@@ -16,44 +16,76 @@ body {
 
 .line {
   fill: none;
-  stroke: steelblue;
+  stroke: magenta;
   stroke-width: 2px;
 }
 
 </style>
 <body>
-<script src="http://d3js.org/d3.v3.js"></script>
-<script>
 
+<script src="http://d3js.org/d3.v3.js"></script>
+<!--
+<script src="http://d3js.org/queue.v1.min.js"></script>
+-->
+
+<script>
 var margin = {top: 20, right: 20, bottom: 30, left: 50},
     width = 960 - margin.left - margin.right,
     height = 500 - margin.top - margin.bottom;
 
-// var formatCount = d3.format(",.0f"),
 var formatTime = d3.time.format("%H:%M:%S"),
-    formatMinutes = function(d) { return formatTime(new Date(1978, 0, 1, 0, 0, d)); };
+    formatMinutes = function(d) { return formatTime(new Date(1978, 10, 15, 0, 0, d)); };
 
 var x = d3.scale.linear().range([0, width]);
 var y = d3.scale.linear().range([height, 0]);
 
-var xAxis = d3.svg.axis()
+xAxis = function() {
+  return d3.svg.axis()
     .scale(x)
     .orient("bottom")
+    .ticks(5)
     .tickFormat(formatMinutes);
+}
 
-var yAxis = d3.svg.axis()
+yAxis = function() {
+  return d3.svg.axis()
     .scale(y)
+    .ticks(10)
     .orient("left");
+}
 
-var line = d3.svg.line()
+line = function() {
+  return d3.svg.line()
     .x(function(d) { return x(d.date); })
     .y(function(d) { return y(d.hr); });
+}
+
+// this stuff redraws all the things on zoom
+function zoomed() {
+  svg.select(".x.axis").call(xAxis());
+  svg.select(".y.axis").call(yAxis());
+  svg.select(".line")
+     .attr("class", "line")
+     .attr("d", line());
+}
 
 var svg = d3.select("body").append("svg")
+    .attr("id", "chart")
     .attr("width", width + margin.left + margin.right)
     .attr("height", height + margin.top + margin.bottom)
   .append("g")
     .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+var clip = svg.append("clipPath")
+    .attr("id", "clip")
+   .append("rect")
+    .attr("x", 0)
+    .attr("y", 0)
+    .attr("width", width)
+    .attr("height", height);
+
+var chartBody = svg.append("g")
+    .attr("clip-path", "url(#clip)");
 
 d3.tsv("/data.tsv", function(error, data) {
 
@@ -65,16 +97,19 @@ d3.tsv("/data.tsv", function(error, data) {
   });
 
   x.domain(d3.extent(data, function(d) { return d.date; }));
-  y.domain(d3.extent(data, function(d) { return d.hr; }));
+  // need to add about 10 here, otherwise the rect clips it
+  y.domain([d3.min(data, function(d){ return d.hr; }), d3.max(data, function(d){ return d.hr;})+10]);
+
+  d3.select('#chart').call(d3.behavior.zoom().x(x).y(y).on("zoom", zoomed));
 
   svg.append("g")
       .attr("class", "x axis")
       .attr("transform", "translate(0," + height + ")")
-      .call(xAxis);
+      .call(xAxis());
 
   svg.append("g")
       .attr("class", "y axis")
-      .call(yAxis)
+      .call(yAxis())
     .append("text")
       .attr("transform", "rotate(-90)")
       .attr("y", 6)
@@ -82,10 +117,11 @@ d3.tsv("/data.tsv", function(error, data) {
       .style("text-anchor", "end")
       .text("HR");
 
-  svg.append("path")
+  chartBody.append("path")
       .datum(data)
       .attr("class", "line")
-      .attr("d", line);
+      .attr("d", line());
+
 });
 
 </script>
