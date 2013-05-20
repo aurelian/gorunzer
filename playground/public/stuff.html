@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+  <title>EM de</title>
+
+  <style>
+
+    svg {
+      font: 12px Consolas, Monaco;
+      /*font: 11px "Lucida Grande", "Lucida Sans Unicode", Verdana, Arial, Helvetica, sans-serif;*/
+      box-shadow: 1px 1px 20px #37240F;
+    }
+
+    path.elevation {
+      fill: #45742E;
+      fill-opacity: .333;
+    }
+
+    path.elevation_line {
+      fill: none;
+      stroke: #45742E;
+      stroke-width: 1.5px;
+      shape-rendering: geometricPrecision;
+    }
+
+    path.hr_line {
+      fill: none;
+      stroke: #C7047F;
+      stroke-width: 1.5px;
+      shape-rendering: geometricPrecision;
+    }
+
+    .zoneLine {
+      fill: none;
+      stroke: grey;
+      stroke-width: .5px;
+      stroke-opacity: .333;
+    }
+
+    .axis path,
+    .axis line {
+      fill: none;
+      stroke: #000;
+      stroke-width: 1.5px;
+      shape-rendering: crispEdges;
+    }
+
+    .brush .extent {
+      stroke: #fff;
+      fill-opacity: .125;
+      shape-rendering: crispEdges;
+    }
+  </style>
+
+  <script src="d3/d3.v3.1.6.min.js"></script>
+  <script src="sample_activity.js"></script>
+
+<body>
+
+<script>
+
+// Stuff TODO
+// * label axes
+// x HR graph - highlight zones (x axis)
+// * elevation graph / HR graph - hilight laps (y axis)
+// * elevation graph / HR graph - tooltip on mouseover
+// + Pace graph
+// + Map
+
+var margin = {top: 10, right: 20, bottom: 175, left: 60},
+    width = 880 - margin.left - margin.right,
+    height = 480 - margin.top - margin.bottom,
+
+    margin2 = {top: 360, right: 20, bottom: 30, left: 60},
+    height2 = 480 - margin2.top - margin2.bottom;
+
+var parseDate = d3.time.format.iso.parse
+var formatTime = d3.time.format("%H:%M:%S"),
+    formatMinutes = function(d) { return formatTime(new Date(1978, 10, 15, 0, 0, d)); };
+
+var x = d3.scale.linear().range([0, width]),
+    y = d3.scale.linear().range([height, 0]),
+    x2 = d3.scale.linear().range([0, width]);
+    y2 = d3.scale.linear().range([height2, 0]);
+
+var xAxis = d3.svg.axis().scale(x).ticks(5).tickFormat(formatMinutes).orient("bottom"),
+    yAxis = d3.svg.axis().scale(y).ticks(7).orient("left"),
+
+    xAxis2 = d3.svg.axis().scale(x2).ticks(5).tickFormat( function(d) { return d + "km"; } ).orient("bottom"),
+    yAxis2 = d3.svg.axis().scale(y2).ticks(3).tickFormat( function(d) { return d + "m"; } ).orient("left");
+
+var brush = d3.svg.brush().x(x2).on("brush", brushed);
+
+var hr_line = d3.svg.line()
+    .interpolate("basis")
+    .x(function(d) { return x(d.Time); })
+    .y(function(d) { return y(d.HeartRate); });
+
+var elevation_line = d3.svg.line()
+    .interpolate("basis")
+    .x(function(d) { return x2(d.Distance); })
+    .y(function(d) { return y2(d.Altitude); });
+
+var elevation = d3.svg.area()
+    .interpolate("basis")
+    .x(function(d) { return x2(d.Distance); })
+    .y0(height2)
+    .y1(function(d) { return y2(d.Altitude); });
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom);
+
+var focus = svg.append("g")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+focus.append("clipPath").attr("id", "clip")
+     .append("rect").attr({"x": 0, "y": 0, "width": width, "height": height});
+
+var context = svg.append("g")
+    .attr("transform", "translate(" + margin2.left + "," + margin2.top + ")");
+
+// var data= activity['Laps'].map(function(e){return e['Points'];}); // [0]; // .reduce(function(p){ return p});
+var data = [];
+activity['Laps'].forEach(function(lap, idx) { lap['Points'].forEach(function(d){
+  if(d['Distance'] > 0) { // records Distance=0, Lat=0, Long=0 most likely on auto-pause
+    d['Lap']= idx + 1;
+    data.push(d);
+  }
+});});
+
+var start_at = +parseDate( data[0]['Time'] );
+data.forEach(function(d) {
+  d.Time      = (+parseDate(d.Time) - start_at)/1000; // seconds since start
+  d.Distance  = +d.Distance/1000; // convert meters to km
+  d.Pace      = +d.Time/d.Distance; // seconds/km
+  // d.Altitude  = +d.Altitude;
+  // d.HeartRate = +d.HeartRate;
+  // d.Lap       = +d.Lap;
+});
+
+x.domain( d3.extent(data.map(function(d) { return d.Time; })) );
+// y.domain( [d3.min(data, function(d){ return d.HeartRate; }), d3.max(data, function(d){ return d.HeartRate;})+10] );
+y.domain( [50, d3.max(data, function(d){ return d.HeartRate;})+10] );
+
+x2.domain( [0, d3.max(data, function(d){ return d.Distance; })] );
+// y2.domain( d3.extent(data.map(function(d){ return d.Altitude; })));
+y2.domain( [0, d3.max(data, function(d){ return d.Altitude; }) + 10] );
+
+//
+var zones = [54, 140, 155, 169, 184];
+focus.append('g').selectAll('.zoneLines')
+     .data(zones).enter().append('line').attr('class', 'zoneLine')
+     .attr({'x1':0, 'y1': function(d) {return y(d);}, 'x2':width, 'y2': function(d){return y(d);}});
+//
+
+focus.append("g").attr("clip-path", "url(#clip)")
+     .append("path").datum(data).attr({"class": "hr_line", "d": hr_line});
+
+focus.append("g")
+    .attr("class", "x axis")
+    .attr("transform", "translate(0," + height + ")")
+    .call(xAxis);
+
+focus.append("g")
+      .attr("class", "y axis")
+      .call(yAxis)
+    .append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("y", -45)
+      .attr("x", -height/2)
+      .attr("dy", ".75em")
+      .style("text-anchor", "end")
+      .text("HRM");
+
+context.append("path")
+    .datum(data)
+    .attr("class", "elevation_line")
+    .attr("d", elevation_line);
+
+context.append("path")
+    .datum(data)
+    .attr("class", "elevation")
+    .attr("d", elevation);
+
+context.append("g")
+    .attr("class", "x axis")
+    .attr("transform", "translate(0," + height2 + ")")
+    .call(xAxis2);
+
+context.append("g")
+    .attr("class", "y axis")
+    .call(yAxis2);
+
+context.append("g")
+    .attr("class", "x brush")
+    .call(brush)
+  .selectAll("rect")
+    .attr("y", -6)
+    .attr("height", height2 + 7);
+
+function brushed() {
+
+  x.domain(d3.extent(data.map(function(d) { return d.Time; })));
+
+  if(!brush.empty()) {
+    x.domain(
+      d3.extent(
+        [
+          x.invert(x2(brush.extent()[0])),
+          x.invert(x2(brush.extent()[1])),
+        ]
+      )
+    );
+  }
+  focus.select("path").attr("d", hr_line);
+  focus.select(".x.axis").call(xAxis);
+  // focus.select(".y.axis").call(yAxis);
+}
+
+</script>
+
+</body>
