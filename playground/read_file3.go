@@ -3,23 +3,25 @@ package main
 import (
   "fmt"
   "flag"
-  "time"
   "io/ioutil"
   "encoding/xml"
+  "encoding/json"
 )
 
 // Activities -> Activity -> Lap [props] -> Track -> Trackpoint
-type Trackpoint struct {
-  Time string
-  HeartRateBpm int `xml:"HeartRateBpm>Value"`
-  Latitude float64 `xml:"Position>LatitudeDegrees"`
+type Point struct {
+  Time      string
+  HeartRate int     `xml:"HeartRateBpm>Value"`
+  Altitude  float64 `xml:"AltitudeMeters"`
+  Distance  float64 `xml:"DistanceMeters"`
+  Latitude  float64 `xml:"Position>LatitudeDegrees"`
   Longitude float64 `xml:"Position>LongitudeDegrees"`
 }
 
 type Lap struct {
   Calories int
   Intensity string
-  Trackpoints []Trackpoint `xml:"Track>Trackpoint"`
+  Points []Point `xml:"Track>Trackpoint"`
 }
 
 type Activity struct {
@@ -49,22 +51,12 @@ func main() {
     panic(fmt.Sprintf("GO FIGURE: I cannot unmarshall like a boss: `%v'", err))
   }
 
-  k := 0
-
-  fmt.Println("date\thr")
-
-  for i := 0; i < len(activity.Laps); i++ {
-    // inception... a loop inside a loop.
-    for j:= 0; j < len(activity.Laps[i].Trackpoints); j++ {
-      time, err := time.Parse(time.RFC3339, activity.Laps[i].Trackpoints[j].Time)
-      if err != nil {
-        fmt.Println("Most likely we failed to parse the time.", err)
-      }
-      fmt.Printf("%d\t%d\n", time.Unix(), activity.Laps[i].Trackpoints[j].HeartRateBpm)
-      k += 1
-      if k > 200 {
-        return
-      }
-    }
+  // and marshall it to json.
+  json, err := json.Marshal(activity)
+  if err != nil {
+    panic(fmt.Sprintf("GO FIGURE: I cannot marshall like a boss: `%v'", err))
   }
+
+  fmt.Printf("%s", json)
+
 }
