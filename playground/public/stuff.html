@@ -8,7 +8,7 @@
     svg {
       font: 12px Consolas, Monaco;
       /*font: 11px "Lucida Grande", "Lucida Sans Unicode", Verdana, Arial, Helvetica, sans-serif;*/
-      box-shadow: 1px 1px 20px #37240F;
+      box-shadow: 1px 1px 5px #37240F;
     }
 
     path.elevation {
@@ -32,9 +32,13 @@
 
     .zoneLine {
       fill: none;
-      stroke: grey;
+      stroke: #C7047F;
       stroke-width: .5px;
       stroke-opacity: .333;
+    }
+
+    text.axisLabel {
+      text-anchor: middle;
     }
 
     .axis path,
@@ -60,18 +64,18 @@
 <script>
 
 // Stuff TODO
-// * label axes
+// x label axes
 // x HR graph - highlight zones (x axis)
 // * elevation graph / HR graph - hilight laps (y axis)
 // * elevation graph / HR graph - tooltip on mouseover
 // + Pace graph
 // + Map
 
-var margin = {top: 10, right: 20, bottom: 175, left: 60},
+var margin = {top: 10, right: 20, bottom: 250, left: 60},
     width = 880 - margin.left - margin.right,
     height = 480 - margin.top - margin.bottom,
 
-    margin2 = {top: 360, right: 20, bottom: 30, left: 60},
+    margin2 = {top: 330, right: 20, bottom: 60, left: 60},
     height2 = 480 - margin2.top - margin2.bottom;
 
 var parseDate = d3.time.format.iso.parse
@@ -112,12 +116,14 @@ var svg = d3.select("body").append("svg")
     .attr("height", height + margin.top + margin.bottom);
 
 var focus = svg.append("g")
+      .attr("class", "focus")
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
 focus.append("clipPath").attr("id", "clip")
-     .append("rect").attr({"x": 0, "y": 0, "width": width, "height": height});
+  .append("rect").attr({"x": 0, "y": 0, "width": width, "height": height});
 
 var context = svg.append("g")
+    .attr("class", "context")
     .attr("transform", "translate(" + margin2.left + "," + margin2.top + ")");
 
 // var data= activity['Laps'].map(function(e){return e['Points'];}); // [0]; // .reduce(function(p){ return p});
@@ -134,9 +140,6 @@ data.forEach(function(d) {
   d.Time      = (+parseDate(d.Time) - start_at)/1000; // seconds since start
   d.Distance  = +d.Distance/1000; // convert meters to km
   d.Pace      = +d.Time/d.Distance; // seconds/km
-  // d.Altitude  = +d.Altitude;
-  // d.HeartRate = +d.HeartRate;
-  // d.Lap       = +d.Lap;
 });
 
 x.domain( d3.extent(data.map(function(d) { return d.Time; })) );
@@ -147,7 +150,7 @@ x2.domain( [0, d3.max(data, function(d){ return d.Distance; })] );
 // y2.domain( d3.extent(data.map(function(d){ return d.Altitude; })));
 y2.domain( [0, d3.max(data, function(d){ return d.Altitude; }) + 10] );
 
-//
+// HR zones
 var zones = [54, 140, 155, 169, 184];
 focus.append('g').selectAll('.zoneLines')
      .data(zones).enter().append('line').attr('class', 'zoneLine')
@@ -155,22 +158,21 @@ focus.append('g').selectAll('.zoneLines')
 //
 
 focus.append("g").attr("clip-path", "url(#clip)")
-     .append("path").datum(data).attr({"class": "hr_line", "d": hr_line});
+  .append("path").datum(data).attr({"class": "hr_line", "d": hr_line});
 
 focus.append("g")
-    .attr("class", "x axis")
-    .attr("transform", "translate(0," + height + ")")
-    .call(xAxis);
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis)
+    .append("text")
+      .attr({ "class": "axisLabel", "x": width/2, "y": 25,"dy": ".75em" })
+      .text("Time");
 
 focus.append("g")
       .attr("class", "y axis")
       .call(yAxis)
     .append("text")
-      .attr("transform", "rotate(-90)")
-      .attr("y", -45)
-      .attr("x", -height/2)
-      .attr("dy", ".75em")
-      .style("text-anchor", "end")
+      .attr({"class": "axisLabel", "transform": "rotate(-90)", "x": -height/2, "y": -50,"dy": ".75em"})
       .text("HRM");
 
 context.append("path")
@@ -184,13 +186,19 @@ context.append("path")
     .attr("d", elevation);
 
 context.append("g")
-    .attr("class", "x axis")
-    .attr("transform", "translate(0," + height2 + ")")
-    .call(xAxis2);
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height2 + ")")
+      .call(xAxis2)
+    .append("text")
+      .attr({"class": "axisLabel", "x":height2/2, "y": -50, "dy": ".75em", "transform": "rotate(-90)"})
+      .text("Elevation");
 
 context.append("g")
-    .attr("class", "y axis")
-    .call(yAxis2);
+      .attr("class", "y axis")
+      .call(yAxis2)
+    .append("text")
+      .attr({ "class": "axisLabel", "x": width/2, "y": height2+25,"dy": ".75em" })
+      .text("Distance");
 
 context.append("g")
     .attr("class", "x brush")
@@ -215,7 +223,6 @@ function brushed() {
   }
   focus.select("path").attr("d", hr_line);
   focus.select(".x.axis").call(xAxis);
-  // focus.select(".y.axis").call(yAxis);
 }
 
 </script>
