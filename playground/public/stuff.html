@@ -96,17 +96,16 @@ var xAxis = d3.svg.axis().scale(x).ticks(5).tickFormat(formatMinutes).orient("bo
 var brush = d3.svg.brush().x(x2).on("brush", brushed);
 
 var hr_line = d3.svg.line()
-    .interpolate("basis")
     .x(function(d) { return x(d.Time); })
     .y(function(d) { return y(d.HeartRate); });
 
 var elevation_line = d3.svg.line()
-    .interpolate("basis")
+    .interpolate("cardinal")
     .x(function(d) { return x2(d.Distance); })
     .y(function(d) { return y2(d.Altitude); });
 
 var elevation = d3.svg.area()
-    .interpolate("basis")
+    .interpolate("cardinal")
     .x(function(d) { return x2(d.Distance); })
     .y0(height2)
     .y1(function(d) { return y2(d.Altitude); });
@@ -120,7 +119,7 @@ var focus = svg.append("g")
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
 focus.append("clipPath").attr("id", "clip")
-  .append("rect").attr({"x": 0, "y": 0, "width": width, "height": height});
+    .append("rect").attr({"x": 0, "y": 0, "width": width, "height": height});
 
 var context = svg.append("g")
     .attr("class", "context")
@@ -158,7 +157,7 @@ focus.append('g').selectAll('.zoneLines')
 //
 
 focus.append("g").attr("clip-path", "url(#clip)")
-  .append("path").datum(data).attr({"class": "hr_line", "d": hr_line});
+    .append("path").datum(data).attr({"class": "hr_line", "d": hr_line});
 
 focus.append("g")
       .attr("class", "x axis")
@@ -175,15 +174,29 @@ focus.append("g")
       .attr({"class": "axisLabel", "transform": "rotate(-90)", "x": -height/2, "y": -50,"dy": ".75em"})
       .text("HRM");
 
-context.append("path")
-    .datum(data)
-    .attr("class", "elevation_line")
-    .attr("d", elevation_line);
+var circle = focus.append("circle").attr({"class": "hover", "opacity": 0, "r": 4.5, "cx": 0, "cy": 0});
+focus.append("rect").datum(data)
+  .attr({"class": "mouse-trap", "opacity": 0, "x": 0, "y": 0, "width": width, "height": height})
+  .on("mouseover", vroom_vroooom_complex_stuff_with_the_circle)
+  .on("mousemove", vroom_vroooom_complex_stuff_with_the_circle)
+  .on("mouseout", function() {
+    circle.attr({"opacity":0});
+    d3.select("path.hr_line").style({"stroke-width": "1.5px"});
+  });
 
-context.append("path")
-    .datum(data)
-    .attr("class", "elevation")
-    .attr("d", elevation);
+var chartPos = findPos(d3.select("svg")[0][0]);
+function vroom_vroooom_complex_stuff_with_the_circle() {
+  var point_x= d3.event.pageX-margin.left-chartPos[0];
+  // know x (in px) and need to get closest x in the data
+  var o = d3.event.currentTarget.__data__.map(
+      function(p){ return {"t": Math.abs(p.Time - Math.floor(x.invert(point_x))), "Time":p.Time, "HeartRate":p.HeartRate} }
+  ).sort(function(a,b){ return a.t-b.t})[0];
+  circle.attr({"opacity":100, "cx": x(o.Time), "cy": y(o.HeartRate)});
+  d3.select("path.hr_line").style({"stroke-width": "3px"});
+}
+
+context.append("path").datum(data).attr("class", "elevation_line").attr("d", elevation_line);
+context.append("path").datum(data).attr("class", "elevation").attr("d", elevation);
 
 context.append("g")
       .attr("class", "x axis")
@@ -223,6 +236,21 @@ function brushed() {
   }
   focus.select("path").attr("d", hr_line);
   focus.select(".x.axis").call(xAxis);
+}
+
+// position of an element without jquery ;p
+// http://stackoverflow.com/questions/6146027/using-javascript-how-to-get-the-position-of-an-element
+function findPos(obj) {
+    var curleft = curtop = 0;
+    if (obj.offsetParent) {
+        curleft = obj.offsetLeft
+        curtop = obj.offsetTop
+        while (obj = obj.offsetParent) {
+            curleft += obj.offsetLeft
+            curtop += obj.offsetTop
+        }
+    }
+    return [curleft,curtop];
 }
 
 </script>
